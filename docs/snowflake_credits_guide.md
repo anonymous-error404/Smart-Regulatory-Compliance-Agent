@@ -1,4 +1,4 @@
-# ❄️ Snowflake Credits Guide — RegIQ Hackathon
+# ❄️ Snowflake Credits Guide — Auris Hackathon
 ### How to spend your $400 wisely and not run out mid-build
 
 ---
@@ -156,7 +156,7 @@ A Snowflake Virtual Warehouse **consumes credits even when it's not running a qu
 
 ```sql
 -- Run this when you create your warehouse
-CREATE WAREHOUSE regiq_dev
+CREATE WAREHOUSE auris_dev
   WAREHOUSE_SIZE = 'X-SMALL'   -- cheapest size, sufficient for dev
   AUTO_SUSPEND = 60             -- suspends after 60 seconds of inactivity
   AUTO_RESUME = TRUE;           -- resumes automatically when a query runs
@@ -164,7 +164,7 @@ CREATE WAREHOUSE regiq_dev
 
 ```sql
 -- Or alter an existing warehouse
-ALTER WAREHOUSE regiq_dev SET AUTO_SUSPEND = 60;
+ALTER WAREHOUSE auris_dev SET AUTO_SUSPEND = 60;
 ```
 
 ### Warehouse Size Guide
@@ -285,7 +285,7 @@ If Streamlit UI queries and heavy agent logic share a warehouse, the UI feels sl
 Even with AUTO_SUSPEND = 60, build the habit of running this at the end of each session:
 
 ```sql
-ALTER WAREHOUSE regiq_dev SUSPEND;
+ALTER WAREHOUSE auris_dev SUSPEND;
 ```
 
 ---
@@ -294,7 +294,7 @@ ALTER WAREHOUSE regiq_dev SUSPEND;
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│              REGIQ CREDITS CHEATSHEET                   │
+│              AURIS CREDITS CHEATSHEET                   │
 ├─────────────────────────────────────────────────────────┤
 │ Total budget          $400                              │
 │ Expected spend        $70–180                           │
@@ -327,4 +327,4 @@ ALTER WAREHOUSE regiq_dev SUSPEND;
 
 ---
 
-*Guide version: Hackathon build stage · RegIQ · Oct 2026*
+*Guide version: Hackathon build stage · Auris · Oct 2026*

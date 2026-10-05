@@ -1,4 +1,4 @@
-# ⚡ RegIQ — Hackathon Ideation Document
+# ⚡ Auris — Hackathon Ideation Document
 ### Snowflake CoCo CLI Hackathon 2026 · GCC Edition · Problem Statement #1
 
 > **Risk, Fraud & Regulatory Intelligence Copilot**
@@ -22,7 +22,7 @@
 
 ## 1. What We're Building
 
-**RegIQ** is a compliance copilot that sits on top of a bank's Snowflake data and gives compliance analysts a natural-language interface to their own data — with every response grounded in real policy documents and real transaction records, not hallucinations.
+**Auris** is a compliance copilot that sits on top of a bank's Snowflake data and gives compliance analysts a natural-language interface to their own data — with every response grounded in real policy documents and real transaction records, not hallucinations.
 
 | | |
 |---|---|
@@ -79,7 +79,7 @@ A junior analyst shouldn't be able to retrieve board-level risk reports or perso
 
 ## 3. Our Solution
 
-### How RegIQ Works — Step by Step
+### How Auris Works — Step by Step
 
 ```
 Step 1 → Analyst types a natural language question
@@ -104,7 +104,7 @@ Step 5 → Cited, audit-ready response returned
 **👤 Compliance Analyst asks:**
 > *"Flag all transactions over ₹10L from the past 7 days, score them for AML risk, and generate a FINTRAC-ready summary report with the applicable RBI circular cited."*
 
-**🤖 RegIQ responds (3.2 seconds later):**
+**🤖 Auris responds (3.2 seconds later):**
 ```
 ✅ 14 transactions flagged | 3 high-risk (score ≥ 80) | 1 Slack alert sent
 
@@ -116,9 +116,9 @@ Step 5 → Cited, audit-ready response returned
    → Potential structuring pattern detected
 ```
 
-### RegIQ vs The Status Quo
+### Auris vs The Status Quo
 
-| | ✅ RegIQ | ❌ Status Quo / Generic AI |
+| | ✅ Auris | ❌ Status Quo / Generic AI |
 |---|---|---|
 | Accuracy | Grounded in YOUR policy docs — no hallucinations | Generic LLMs hallucinate on specific rules |
 | Access control | Permission-aware — analyst sees only what they're cleared for | No access control — everyone sees everything |
@@ -260,7 +260,7 @@ For companies **not on Snowflake**:
 
 ## 7. Permission-Aware RAG
 
-This is the single most important differentiator. Most RAG systems retrieve everything and hope the application handles access control. RegIQ filters **before** ranking, not after.
+This is the single most important differentiator. Most RAG systems retrieve everything and hope the application handles access control. Auris filters **before** ranking, not after.
 
 ### The Filter Flow
 
@@ -310,7 +310,7 @@ This is the single most important differentiator. Most RAG systems retrieve ever
 
 - Fraud alert posted to compliance channel when risk score ≥ threshold
 - Daily risk summary posted automatically each morning
-- Ask RegIQ questions directly from Slack (`@regiq what's our current LCR?`)
+- Ask Auris questions directly from Slack (`@auris what's our current LCR?`)
 - Approval workflow for flagged transactions directly inside Slack
 - Regulatory deadline reminders
 - Each alert includes: transaction ID + risk score + reason + regulatory reference
