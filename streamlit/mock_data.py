@@ -368,3 +368,272 @@ def get_mock_structuring_groups() -> list[dict[str, Any]]:
         )
 
     return groups
+
+
+# ---------------------------------------------------------------------------
+# Risk Heatmap data
+# ---------------------------------------------------------------------------
+
+def get_mock_risk_heatmap(days: int = 14) -> pd.DataFrame:
+    """
+    Generate a risk score heatmap matrix (hour × day).
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: DATE, HOUR, AVG_RISK_SCORE, TXN_COUNT, FLAGGED_COUNT
+    """
+    end_date = datetime.now().date()
+    records: list[dict[str, Any]] = []
+
+    for d in range(days):
+        current_date = end_date - timedelta(days=(days - 1 - d))
+        for hour in range(24):
+            # Simulate higher risk during late night and early morning
+            if 0 <= hour <= 5:
+                base_risk = float(_RNG.integers(40, 75))
+                txn_count = int(_RNG.integers(5, 25))
+            elif 9 <= hour <= 17:
+                base_risk = float(_RNG.integers(15, 55))
+                txn_count = int(_RNG.integers(80, 300))
+            else:
+                base_risk = float(_RNG.integers(20, 60))
+                txn_count = int(_RNG.integers(20, 80))
+
+            flagged = int(txn_count * (base_risk / 200))
+
+            records.append({
+                "DATE": str(current_date),
+                "HOUR": hour,
+                "AVG_RISK_SCORE": round(base_risk, 1),
+                "TXN_COUNT": txn_count,
+                "FLAGGED_COUNT": flagged,
+            })
+
+    return pd.DataFrame(records)
+
+
+# ---------------------------------------------------------------------------
+# Fraud Ring / Network Graph data
+# ---------------------------------------------------------------------------
+
+_ACCOUNT_IDS: list[str] = [
+    "ACC001", "ACC002", "ACC003", "ACC004", "ACC005",
+    "ACC006", "ACC007", "ACC008", "ACC009", "ACC010",
+    "ACC011", "ACC012", "ACC013", "ACC014", "ACC015",
+]
+
+def get_mock_fraud_ring() -> dict[str, Any]:
+    """
+    Generate a fraud ring network graph dataset.
+
+    Returns
+    -------
+    dict
+        Keys:
+        - ``nodes``: list[dict] with ``id``, ``label``, ``type``,
+          ``risk_score``, ``flagged``
+        - ``edges``: list[dict] with ``source``, ``target``, ``amount``,
+          ``txn_count``, ``label``
+        - ``ring_name``: str
+    """
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+    # Ring 1: Main ring (6 nodes)
+    ring1_customers = random.sample(_CUSTOMER_NAMES, 6)
+    ring1_accounts = random.sample(_ACCOUNT_IDS, 6)
+
+    for i, (name, acc) in enumerate(zip(ring1_customers, ring1_accounts)):
+        risk = int(_RNG.integers(55, 98))
+        nodes.append({
+            "id": acc,
+            "label": name,
+            "type": "individual" if i < 4 else "shell_company",
+            "risk_score": risk,
+            "flagged": risk > 70,
+            "group": 1,
+        })
+
+    # Circular flow within ring
+    for i in range(len(ring1_accounts)):
+        target_idx = (i + 1) % len(ring1_accounts)
+        amount = round(float(_RNG.integers(200_000, 900_000)), 2)
+        edges.append({
+            "source": ring1_accounts[i],
+            "target": ring1_accounts[target_idx],
+            "amount": amount,
+            "txn_count": int(_RNG.integers(2, 8)),
+            "label": f"₹{amount/100_000:.1f}L ({int(_RNG.integers(2,8))} txns)",
+        })
+
+    # Ring 2: Satellite nodes (4 feeder accounts)
+    ring2_customers = random.sample(
+        [n for n in _CUSTOMER_NAMES if n not in ring1_customers], 4
+    )
+    ring2_accounts = [a for a in _ACCOUNT_IDS if a not in ring1_accounts][:4]
+
+    for name, acc in zip(ring2_customers, ring2_accounts):
+        risk = int(_RNG.integers(40, 80))
+        nodes.append({
+            "id": acc,
+            "label": name,
+            "type": "feeder",
+            "risk_score": risk,
+            "flagged": risk > 70,
+            "group": 2,
+        })
+
+    # Feeders connect to ring nodes
+    for i, acc in enumerate(ring2_accounts):
+        target = ring1_accounts[i % len(ring1_accounts)]
+        amount = round(float(_RNG.integers(100_000, 500_000)), 2)
+        edges.append({
+            "source": acc,
+            "target": target,
+            "amount": amount,
+            "txn_count": int(_RNG.integers(1, 5)),
+            "label": f"₹{amount/100_000:.1f}L",
+        })
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "ring_name": "Suspected Layering Network — West Region",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Audit Trail data
+# ---------------------------------------------------------------------------
+
+_AGENT_NAMES: list[str] = [
+    "RiskAssessmentAgent", "FraudDetectionAgent", "RegulatoryReportAgent",
+]
+
+_AUDIT_QUERIES: list[str] = [
+    "Flag all transactions over ₹10L in the last 7 days",
+    "What is our current LCR status?",
+    "Generate AML summary for September 2026",
+    "Check for structuring patterns in NEFT transfers",
+    "What does RBI say about KYC for high-risk customers?",
+    "Show Basel III capital adequacy ratios",
+    "List all watchlist matches this week",
+    "Generate FINTRAC report for Q2 FY27",
+    "Check fraud alerts for Arjun Kapoor",
+    "What are the STR filing requirements under PMLA?",
+    "Run risk assessment on cash deposits > ₹5L",
+    "Show pending compliance deadlines",
+]
+
+
+def get_mock_audit_trail(n: int = 30) -> pd.DataFrame:
+    """
+    Generate *n* synthetic audit trail entries.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: AUDIT_ID, TIMESTAMP, USER_ID, USERNAME, ROLE,
+                 QUERY, AGENTS_INVOKED, RISK_SCORE, STATUS,
+                 RESPONSE_PREVIEW
+    """
+    end_date = datetime.now()
+    records: list[dict[str, Any]] = []
+
+    for i in range(n):
+        user = random.choice(
+            [
+                {"user_id": "USER001", "username": "Priya Sharma", "role": "junior_analyst"},
+                {"user_id": "USER002", "username": "Rahul Mehta", "role": "senior_analyst"},
+                {"user_id": "USER003", "username": "Deepa Krishnan", "role": "compliance_head"},
+            ]
+        )
+        query = random.choice(_AUDIT_QUERIES)
+        num_agents = int(_RNG.integers(1, 4))
+        agents = random.sample(_AGENT_NAMES, min(num_agents, len(_AGENT_NAMES)))
+        risk = int(_RNG.integers(0, 100))
+        ts = _random_date(end_date - timedelta(days=14), end_date)
+
+        records.append({
+            "AUDIT_ID": f"AUD{10000 + i:05d}",
+            "TIMESTAMP": ts.strftime("%Y-%m-%d %H:%M:%S"),
+            "USER_ID": user["user_id"],
+            "USERNAME": user["username"],
+            "ROLE": user["role"],
+            "QUERY": query,
+            "AGENTS_INVOKED": ", ".join(a.replace("Agent", "") for a in agents),
+            "RISK_SCORE": risk,
+            "STATUS": random.choice(["Completed", "Completed", "Completed", "Error"]),
+            "RESPONSE_PREVIEW": f"Analysis complete. {risk}% risk. {len(agents)} agent(s) invoked.",
+        })
+
+    df = pd.DataFrame(records)
+    df.sort_values("TIMESTAMP", ascending=False, inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Role-based filtered data helper
+# ---------------------------------------------------------------------------
+
+def get_role_data_scope(role: str) -> dict[str, Any]:
+    """
+    Return the data visibility scope for a given user role or clearance level.
+
+    Returns
+    -------
+    dict
+        Keys: max_amount_visible, can_see_pii, can_see_watchlist,
+              can_see_board_reports, visible_regions
+    """
+    try:
+        import config
+        return config.get_role_config(role)
+    except Exception:
+        return {
+            "max_amount_visible": 50_00_000,
+            "can_see_pii": False,
+            "can_see_watchlist": False,
+            "can_see_board_reports": False,
+            "visible_regions": ["West"],
+        }
+
+
+def filter_transactions_by_role(
+    df: pd.DataFrame, role: str
+) -> pd.DataFrame:
+    """
+    Filter a transactions DataFrame according to role-based access rules.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw transactions DataFrame.
+    role : str
+        User role string.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered DataFrame respecting the role's data scope.
+    """
+    scope = get_role_data_scope(role)
+    filtered = df.copy()
+
+    # Amount cap: junior analysts can't see very high-value transactions
+    max_amount = scope["max_amount_visible"]
+    if max_amount < float("inf"):
+        filtered = filtered[filtered["AMOUNT"] <= max_amount]
+
+    # Mask customer names for junior analysts (show only initials)
+    if not scope["can_see_pii"]:
+        filtered["CUSTOMER_NAME"] = filtered["CUSTOMER_NAME"].apply(
+            lambda name: " ".join(
+                word[0] + "***" if len(word) > 1 else word
+                for word in name.split()
+            )
+        )
+
+    return filtered
