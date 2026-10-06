@@ -337,6 +337,9 @@ class CortexClient:
     ``config.ENV == 'snowflake'``, or to the local mock implementations when
     ``config.ENV == 'local'``.
 
+    Now integrates with :class:`~src.rag.rag_pipeline.RAGPipeline` for
+    permission-aware, reranked document retrieval.
+
     Examples
     --------
     >>> client = CortexClient()
@@ -349,6 +352,15 @@ class CortexClient:
         self._env: str = getattr(config, "ENV", "local")
         self._model: str = getattr(config, "CORTEX_MODEL", "snowflake-arctic-instruct")
         self._search_service: str = getattr(config, "CORTEX_SEARCH_SERVICE", "AURIS_REGULATORY_SEARCH")
+
+        # Initialise the permission-aware RAG pipeline
+        try:
+            from src.rag.rag_pipeline import RAGPipeline  # noqa: PLC0415
+            self._rag_pipeline = RAGPipeline(session=session, top_k=5)
+            logger.info("[CortexClient] RAG pipeline initialised.")
+        except Exception as exc:  # noqa: BLE001
+            self._rag_pipeline = None
+            logger.warning("[CortexClient] RAG pipeline unavailable: %s", exc)
 
         if self._env == "snowflake":
             # Attempt to import real Cortex; fall back to mock on failure
@@ -396,36 +408,30 @@ class CortexClient:
         categories: list[str] | None = None,
         **kwargs: Any,
     ) -> list[dict[str, Any]]:
-        """Perform a RAG search over the regulatory document corpus."""
+        """Perform a permission-aware RAG search over the regulatory corpus.
+
+        Delegates to :class:`~src.rag.rag_pipeline.RAGPipeline` which handles
+        permission pre-filtering, BM25/Cortex retrieval, and reranking.
+        Falls back to the legacy ``mock_rag_search()`` if the pipeline is
+        unavailable.
+        """
         resolved_categories = categories or doc_categories or []
-        if self._env != "snowflake":
-            return mock_rag_search(query, user_role, resolved_categories)
 
-        # Real path: call Cortex Search via Snowpark session
-        try:
-            from src.snowflake_connector import get_session  # noqa: PLC0415
-
-            session = get_session()
-            # Cortex Search API (preview syntax as of 2024)
-            result = (
-                session.sql(
-                    f"""
-                    SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-                        '{self._search_service}',
-                        '{query.replace("'", "''")}',
-                        OBJECT_CONSTRUCT('limit', 3)
-                    ) AS search_results
-                    """
+        # Primary path: use the new permission-aware RAG pipeline
+        if self._rag_pipeline is not None:
+            try:
+                return self._rag_pipeline.search(
+                    query=query,
+                    user_role=user_role,
+                    categories=resolved_categories or None,
                 )
-                .collect()[0]["SEARCH_RESULTS"]
-            )
-            import json as _json
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "[CortexClient] RAG pipeline search failed: %s. Falling back.", exc
+                )
 
-            raw = _json.loads(result)
-            return raw.get("results", [])
-        except Exception as exc:  # noqa: BLE001
-            logger.error("[CortexClient] RAG search failed: %s. Falling back to mock.", exc)
-            return mock_rag_search(query, user_role, doc_categories)
+        # Fallback: legacy mock search
+        return mock_rag_search(query, user_role, resolved_categories)
 
     # Convenience alias
     search = rag_search

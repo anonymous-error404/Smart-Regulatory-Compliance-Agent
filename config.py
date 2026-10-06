@@ -47,16 +47,90 @@ LARGE_TXN_THRESHOLD_INR = int(os.getenv("LARGE_TXN_THRESHOLD_INR", "1_000_000"))
 SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
 
 # ─────────────────────────────────────────────
-# User Permission Roles (for demo — hardcoded)
+# Universal Role & Clearance Rank Configuration
 # ─────────────────────────────────────────────
+# Clearance levels: 1 (Basic / Operational) -> 4 (Executive / Audit)
+# Any role/designation maps to a clearance rank, allowed document categories,
+# PII visibility, and regional scopes.
 USER_ROLES = {
-    "junior_analyst":    {"level": 1, "allowed_doc_categories": ["public_policy", "aml_guidelines"]},
-    "senior_analyst":    {"level": 2, "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports"]},
-    "compliance_head":   {"level": 3, "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports", "board_reports", "kyc_pii"]},
+    "Level 1 (Operational)": {
+        "level": 1,
+        "label": "Level 1 — Operational / Analyst",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines"],
+        "can_see_pii": False,
+        "can_see_watchlist": False,
+        "can_see_board_reports": False,
+        "max_amount_visible": 50_00_000,
+        "visible_regions": ["West"],
+    },
+    "Level 2 (Senior / Specialist)": {
+        "level": 2,
+        "label": "Level 2 — Senior Specialist",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports"],
+        "can_see_pii": False,
+        "can_see_watchlist": True,
+        "can_see_board_reports": False,
+        "max_amount_visible": 500_00_00_000,
+        "visible_regions": ["West", "South", "North"],
+    },
+    "Level 3 (Executive / Head)": {
+        "level": 3,
+        "label": "Level 3 — Executive / Compliance Head",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports", "board_reports", "kyc_pii"],
+        "can_see_pii": True,
+        "can_see_watchlist": True,
+        "can_see_board_reports": True,
+        "max_amount_visible": float("inf"),
+        "visible_regions": ["West", "South", "North", "East", "Central"],
+    },
+    # Backwards-compatibility aliases for system roles
+    "junior_analyst": {
+        "level": 1,
+        "label": "Junior Analyst (Level 1)",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines"],
+        "can_see_pii": False,
+        "can_see_watchlist": False,
+        "can_see_board_reports": False,
+        "max_amount_visible": 50_00_000,
+        "visible_regions": ["West"],
+    },
+    "senior_analyst": {
+        "level": 2,
+        "label": "Senior Analyst (Level 2)",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports"],
+        "can_see_pii": False,
+        "can_see_watchlist": True,
+        "can_see_board_reports": False,
+        "max_amount_visible": 500_00_00_000,
+        "visible_regions": ["West", "South", "North"],
+    },
+    "compliance_head": {
+        "level": 3,
+        "label": "Compliance Head (Level 3)",
+        "allowed_doc_categories": ["public_policy", "aml_guidelines", "internal_policy", "risk_reports", "board_reports", "kyc_pii"],
+        "can_see_pii": True,
+        "can_see_watchlist": True,
+        "can_see_board_reports": True,
+        "max_amount_visible": float("inf"),
+        "visible_regions": ["West", "South", "North", "East", "Central"],
+    },
 }
+
+def get_role_config(role: str) -> dict:
+    """Resolve role configuration dict by role string or rank alias."""
+    if role in USER_ROLES:
+        return USER_ROLES[role]
+    # Check lowercase or fallback to level 1
+    role_lower = str(role).lower()
+    for r_key, r_cfg in USER_ROLES.items():
+        if r_key.lower() == role_lower or r_cfg.get("label", "").lower() == role_lower:
+            return r_cfg
+    # Fallback to level 1 basic operational scope
+    return USER_ROLES["Level 1 (Operational)"]
 
 # ─────────────────────────────────────────────
 # Synthetic Data Sizes
 # ─────────────────────────────────────────────
 SYNTHETIC_TRANSACTION_COUNT = 10_000
 SYNTHETIC_KYC_COUNT         = 500
+
