@@ -117,7 +117,7 @@ def get_mock_transactions(n: int = 50) -> pd.DataFrame:
                 "TRANSACTION_TYPE": random.choice(_TRANSACTION_TYPES),
                 "BANK": random.choice(_BANKS),
                 "DATE": _random_date(start_date, end_date).strftime(
-                    "%Y-%m-%d %H:%M"
+                    "%d-%m-%Y %H:%M"
                 ),
                 "STATUS": random.choice(["Completed", "Pending", "Flagged"]),
             }
@@ -183,7 +183,7 @@ def get_mock_fraud_cases(n: int = 10) -> pd.DataFrame:
                     ["Priya Sharma", "Rahul Mehta", "Deepa Krishnan"]
                 ),
                 "OPENED_DATE": _random_date(start_date, end_date).strftime(
-                    "%Y-%m-%d"
+                    "%d-%m-%Y"
                 ),
             }
         )
@@ -259,7 +259,7 @@ def get_mock_regulatory_reports() -> pd.DataFrame:
                 "GENERATED_BY": random.choice(
                     ["Priya Sharma", "Rahul Mehta", "Deepa Krishnan"]
                 ),
-                "GENERATED_AT": gen_date.strftime("%Y-%m-%d %H:%M"),
+                "GENERATED_AT": gen_date.strftime("%d-%m-%Y %H:%M"),
                 "STATUS": random.choice(_REPORT_STATUSES),
             }
         )
@@ -281,43 +281,43 @@ def get_regulatory_calendar() -> list[dict[str, str]]:
     """
     return [
         {
-            "deadline": "15 Oct 2026",
+            "deadline": "15-10-2026",
             "regulator": "RBI",
             "description": "CRILC Q2 Report — Submit Central Repository of Information on Large Credits for Q2 FY27",
             "priority": "High",
         },
         {
-            "deadline": "31 Oct 2026",
+            "deadline": "31-10-2026",
             "regulator": "FIU-IND",
             "description": "AML STR Filing for Sep 2026 — Suspicious Transaction Reports for September 2026",
             "priority": "High",
         },
         {
-            "deadline": "7 Nov 2026",
+            "deadline": "07-11-2026",
             "regulator": "RBI",
             "description": "Basel LCR Monthly Report — Liquidity Coverage Ratio submission for Oct 2026",
             "priority": "Medium",
         },
         {
-            "deadline": "15 Nov 2026",
+            "deadline": "15-11-2026",
             "regulator": "SEBI",
             "description": "Insider Trading Disclosure — Promoter shareholding & insider trading compliance report",
             "priority": "Medium",
         },
         {
-            "deadline": "30 Nov 2026",
+            "deadline": "30-11-2026",
             "regulator": "RBI",
             "description": "Financial Inclusion Report — Progress report on financial inclusion targets",
             "priority": "Low",
         },
         {
-            "deadline": "15 Dec 2026",
+            "deadline": "15-12-2026",
             "regulator": "FIU-IND",
             "description": "AML STR Filing for Nov 2026 — Suspicious Transaction Reports for November 2026",
             "priority": "High",
         },
         {
-            "deadline": "31 Dec 2026",
+            "deadline": "31-12-2026",
             "regulator": "RBI",
             "description": "Annual KYC Review — Complete periodic KYC review for high-risk customers",
             "priority": "High",
@@ -353,7 +353,7 @@ def get_mock_structuring_groups() -> list[dict[str, Any]]:
                     "amount": amt,
                     "date": (
                         datetime.now() - timedelta(days=int(_RNG.integers(0, 7)))
-                    ).strftime("%Y-%m-%d"),
+                    ).strftime("%d-%m-%Y"),
                     "type": random.choice(_TRANSACTION_TYPES),
                 }
             )

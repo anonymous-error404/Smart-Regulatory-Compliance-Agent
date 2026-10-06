@@ -546,7 +546,7 @@ with t_reports:
         with dc1: d_from = st.date_input("From", value=date(2026,10,1))
         with dc2: d_to = st.date_input("To", value=date(2026,10,31))
 
-    period = f"{d_from.strftime('%d %b %Y')} – {d_to.strftime('%d %b %Y')}"
+    period = f"{d_from.strftime('%d-%m-%Y')} – {d_to.strftime('%d-%m-%Y')}"
     gen_by = st.session_state.user["username"]
 
     if st.button("Generate", type="primary"):
@@ -555,7 +555,7 @@ with t_reports:
                 rr = _reg_agent.run(query=f"Generate {rtype} for {period}", user_identity=st.session_state.user)
                 content = rr.get("report_text") or rr.get("summary","")
             else:
-                content = f"""## {rtype}\n**Period:** {period} &nbsp;|&nbsp; **By:** {gen_by} &nbsp;|&nbsp; **Date:** {datetime.now().strftime('%d %b %Y')}\n\n---\n\n### Executive Summary\nAll data sourced from core banking and validated against RBI Master Directions.\n\n### Key Findings\n- Transactions processed: **42,350**\n- Flagged for AML: **87** (0.21%)\n- STRs filed: **12**\n- High-risk monitoring: **34** customers\n- Watchlist matches: **7**\n\n### AML Compliance\nInstitution remains compliant with PMLA 2002. All STRs filed within 7-day window. CDD reviews current for 98.3% of customer base.\n\n### Recommendations\n1. Complete KYC refresh for 67 dormant high-risk accounts by 31 Oct 2026.\n2. Review 3 pending STRs before filing deadline.\n3. Staff AML training refresh — Nov 2026."""
+                content = f"""## {rtype}\n**Period:** {period} &nbsp;|&nbsp; **By:** {gen_by} &nbsp;|&nbsp; **Date:** {datetime.now().strftime('%d-%m-%Y')}\n\n---\n\n### Executive Summary\nAll data sourced from core banking and validated against RBI Master Directions.\n\n### Key Findings\n- Transactions processed: **42,350**\n- Flagged for AML: **87** (0.21%)\n- STRs filed: **12**\n- High-risk monitoring: **34** customers\n- Watchlist matches: **7**\n\n### AML Compliance\nInstitution remains compliant with PMLA 2002. All STRs filed within 7-day window. CDD reviews current for 98.3% of customer base.\n\n### Recommendations\n1. Complete KYC refresh for 67 dormant high-risk accounts by 31-10-2026.\n2. Review 3 pending STRs before filing deadline.\n3. Staff AML training refresh — Nov 2026."""
 
         if content:
             st.markdown("---")
@@ -613,7 +613,7 @@ with t_audit:
     st.dataframe(filt[["AUDIT_ID","TIMESTAMP","USERNAME","ROLE","QUERY","AGENTS_INVOKED","RISK_SCORE","STATUS"]], hide_index=True, height=400)
 
     try:
-        atxt = f"AUDIT TRAIL EXPORT\nGenerated: {datetime.now().strftime('%d %b %Y %H:%M')}\nRecords: {len(filt)}\n\n"
+        atxt = f"AUDIT TRAIL EXPORT\nGenerated: {datetime.now().strftime('%d-%m-%Y %H:%M')}\nRecords: {len(filt)}\n\n"
         for _, r in filt.head(50).iterrows():
             atxt += f"[{r['TIMESTAMP']}] {r['USERNAME']} ({r['ROLE']})\n  {r['QUERY']}\n  Agents: {r['AGENTS_INVOKED']} | Risk: {r['RISK_SCORE']} | {r['STATUS']}\n\n"
         apdf = export_report_to_pdf(atxt, "Audit Trail Export", st.session_state.user["username"],
