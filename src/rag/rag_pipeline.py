@@ -409,46 +409,47 @@ class RAGPipeline:
             # Build permission-scoped filter
             cortex_filter = self._permission_filter.build_cortex_filter(user_role)
 
-            filter_json = json.dumps(cortex_filter).replace("'", "''")
-            query_escaped = query.replace("'", "''")
+            # Build search request payload as JSON string
+            request_payload = {
+                "query": query,
+                "columns": [
+                    "CONTENT", "DOC_NAME", "DOC_CATEGORY",
+                    "SECTION_NUMBER", "SECTION_TITLE", "SOURCE_URL",
+                    "PERMISSION_LEVEL", "EFFECTIVE_DATE"
+                ],
+                "filter": cortex_filter,
+                "limit": 20
+            }
+            payload_json = json.dumps(request_payload).replace("'", "''")
 
             sql = f"""
             SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
                 '{self._search_service}',
-                '{query_escaped}',
-                OBJECT_CONSTRUCT(
-                    'columns', ARRAY_CONSTRUCT(
-                        'CONTENT', 'DOC_NAME', 'DOC_CATEGORY',
-                        'SECTION_NUMBER', 'SECTION_TITLE', 'SOURCE_URL',
-                        'PERMISSION_LEVEL', 'EFFECTIVE_DATE'
-                    ),
-                    'filter', PARSE_JSON('{filter_json}'),
-                    'limit', 20
-                )
+                '{payload_json}'
             ) AS search_results
             """
             rows = self.session.sql(sql).collect()
-            if rows:
+            if rows and rows[0]["SEARCH_RESULTS"]:
                 raw = json.loads(rows[0]["SEARCH_RESULTS"])
                 results = raw.get("results", [])
-                # Normalize keys to lowercase
-                return [
-                    {
-                        "doc_name": r.get("DOC_NAME", r.get("doc_name", "")),
-                        "doc_category": r.get("DOC_CATEGORY", r.get("doc_category", "")),
-                        "section_number": r.get("SECTION_NUMBER", r.get("section_number", "")),
-                        "section_title": r.get("SECTION_TITLE", r.get("section_title", "")),
-                        "content": r.get("CONTENT", r.get("content", "")),
-                        "source_url": r.get("SOURCE_URL", r.get("source_url", "")),
-                        "permission_level": r.get("PERMISSION_LEVEL", r.get("permission_level", "junior_analyst")),
-                        "effective_date": r.get("EFFECTIVE_DATE", r.get("effective_date", "")),
-                        "relevance_score": float(r.get("score", r.get("relevance_score", 0.5))),
-                    }
-                    for r in results
-                ]
+                if results:
+                    return [
+                        {
+                            "doc_name": r.get("DOC_NAME", r.get("doc_name", "")),
+                            "doc_category": r.get("DOC_CATEGORY", r.get("doc_category", "")),
+                            "section_number": r.get("SECTION_NUMBER", r.get("section_number", "")),
+                            "section_title": r.get("SECTION_TITLE", r.get("section_title", "")),
+                            "content": r.get("CONTENT", r.get("content", "")),
+                            "source_url": r.get("SOURCE_URL", r.get("source_url", "")),
+                            "permission_level": r.get("PERMISSION_LEVEL", r.get("permission_level", "junior_analyst")),
+                            "effective_date": r.get("EFFECTIVE_DATE", r.get("effective_date", "")),
+                            "relevance_score": float(r.get("score", r.get("relevance_score", 0.5))),
+                        }
+                        for r in results
+                    ]
         except Exception as exc:
-            logger.error(
-                "[RAGPipeline] Cortex Search failed, falling back to local: %s", exc
+            logger.warning(
+                "[RAGPipeline] Cortex Search notice: %s. Using local regulatory search.", exc
             )
 
         return self._search_local(query, user_role)

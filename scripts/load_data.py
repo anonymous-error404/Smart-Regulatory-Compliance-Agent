@@ -290,6 +290,7 @@ def load_all_data(selected_tables: list[str] | None = None, dry_run: bool = Fals
                 overwrite=True,
                 auto_create_table=False,
                 quote_identifiers=False,
+                use_logical_type=True,
             )
 
             # If VARIANT column needs parsing from JSON string to native VARIANT

@@ -4,11 +4,20 @@ Change CORTEX_MODEL and ENV here to switch between dev/demo modes.
 """
 
 import os
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    _ENV_FILE = Path(__file__).resolve().parent / ".env"
+    load_dotenv(_ENV_FILE)
+except ImportError:
+    # Running inside Snowflake Python runtime where dotenv is not installed and .env is not needed
+    pass
 
 # ─────────────────────────────────────────────
 # Environment: "local" | "snowflake"
 # ─────────────────────────────────────────────
-ENV = os.getenv("AURIS_ENV", os.getenv("REGIQ_ENV", "local"))
+ENV = os.getenv("AURIS_ENV", os.getenv("REGIQ_ENV", "snowflake"))
 
 # ─────────────────────────────────────────────
 # Snowflake Connection
@@ -23,11 +32,9 @@ SNOWFLAKE_ROLE      = os.getenv("SNOWFLAKE_ROLE", "SYSADMIN")
 
 # ─────────────────────────────────────────────
 # Cortex LLM Model
-# Week 1-3 dev  → snowflake-arctic-instruct
-# Integration   → mistral-large2
-# Final demo    → mistral-large2 / llama3.1-70b
+# Active high-performance model: llama3.1-8b
 # ─────────────────────────────────────────────
-CORTEX_MODEL = os.getenv("CORTEX_MODEL", "snowflake-arctic-instruct")
+CORTEX_MODEL = os.getenv("CORTEX_MODEL", "llama3.1-8b")
 
 # ─────────────────────────────────────────────
 # Cortex Search Service Names

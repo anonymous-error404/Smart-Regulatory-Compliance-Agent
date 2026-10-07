@@ -173,8 +173,11 @@ class PDFParser:
 
     @staticmethod
     def _parse_with_pypdf2(path: Path) -> list[dict[str, Any]]:
-        """Extract text using PyPDF2."""
-        from PyPDF2 import PdfReader  # type: ignore[import]
+        """Extract text using pypdf or PyPDF2."""
+        try:
+            from pypdf import PdfReader  # type: ignore[import]
+        except ImportError:
+            from PyPDF2 import PdfReader  # type: ignore[import]
 
         pages: list[dict[str, Any]] = []
         reader = PdfReader(str(path))
@@ -241,6 +244,11 @@ class PDFParser:
         try:
             import pdfplumber  # noqa: F401
             return "pdfplumber"
+        except ImportError:
+            pass
+        try:
+            from pypdf import PdfReader  # noqa: F401
+            return "pypdf2"
         except ImportError:
             pass
         try:

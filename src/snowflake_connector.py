@@ -105,8 +105,14 @@ _connection: Any = None  # snowflake.connector.SnowflakeConnection
 
 def _build_connection_params() -> dict:
     """Assemble Snowflake connection parameters from ``config``."""
+    account = config.SNOWFLAKE_ACCOUNT
+    if "://" in account:
+        account = account.split("://")[-1]
+    if account.endswith(".snowflakecomputing.com"):
+        account = account.replace(".snowflakecomputing.com", "")
+
     return {
-        "account":   config.SNOWFLAKE_ACCOUNT,
+        "account":   account,
         "user":      config.SNOWFLAKE_USER,
         "password":  config.SNOWFLAKE_PASSWORD,
         "database":  config.SNOWFLAKE_DATABASE,

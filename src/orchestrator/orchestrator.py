@@ -74,6 +74,13 @@ class AurisOrchestrator:
             Active Snowpark session passed down to every agent and used for
             audit-trail writes.  When None, all agents operate in local mode.
         """
+        if session is None and getattr(config, "ENV", "local") == "snowflake":
+            try:
+                from src.snowflake_connector import get_session
+                session = get_session()
+            except Exception as exc:
+                logger.warning("[Orchestrator] Could not connect to Snowflake: %s. Operating in local mode.", exc)
+
         self.session: Any = session
 
         # Instantiate agents

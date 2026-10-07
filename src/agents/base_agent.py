@@ -305,13 +305,13 @@ class BaseAgent(ABC):
                 query_escaped = (query or "").replace("'", "''")
                 record_json = json.dumps(record).replace("'", "''")
 
+                citations_json = json.dumps(response.get("citations", [])).replace("'", "''")
                 sql = (
                     "INSERT INTO AUDIT_TRAIL "
-                    "(AUDIT_ID, USER_ID, AGENT, QUERY, RISK_SCORE, SUMMARY, "
-                    "FULL_RESPONSE_JSON, CREATED_AT) "
-                    f"VALUES ('{record['audit_id']}', '{user_id}', '{self.agent_name}', "
-                    f"'{query_escaped}', {risk_score_sql}, '{summary_escaped}', "
-                    f"'{record_json}', CURRENT_TIMESTAMP())"
+                    "(AUDIT_ID, USER_ID, QUERY_TEXT, AGENT_ROUTED_TO, RESPONSE_SUMMARY, "
+                    "RISK_SCORE_RETURNED, REGULATORY_CITATIONS, QUERY_TIMESTAMP, SESSION_ID) "
+                    f"SELECT '{record['audit_id']}', '{user_id}', '{query_escaped}', '{self.agent_name}', "
+                    f"'{summary_escaped}', {risk_score_sql}, PARSE_JSON('{citations_json}'), CURRENT_TIMESTAMP(), '{record.get('session_id', '')}'"
                 )
                 self.session.sql(sql).collect()
                 logger.info(

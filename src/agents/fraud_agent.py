@@ -231,7 +231,7 @@ class FraudDetectionAgent(BaseAgent):
                     k.CUSTOMER_ID,
                     k.FULL_NAME                AS kyc_name,
                     w.ENTITY_NAME              AS watchlist_name,
-                    w.LIST_NAME                AS list_name,
+                    w.SANCTION_LIST            AS list_name,
                     JAROWINKLER_SIMILARITY(
                         UPPER(k.FULL_NAME),
                         UPPER(w.ENTITY_NAME)
@@ -243,7 +243,7 @@ class FraudDetectionAgent(BaseAgent):
                         UPPER(k.FULL_NAME),
                         UPPER(w.ENTITY_NAME)
                     ) >= 85
-                WHERE k.KYC_STATUS = 'ACTIVE'
+                WHERE k.KYC_STATUS IN ('VERIFIED', 'ACTIVE', 'COMPLETE')
                   {id_filter}
                 ORDER BY match_score DESC
                 LIMIT 50
@@ -313,12 +313,12 @@ class FraudDetectionAgent(BaseAgent):
                 SELECT
                     CUSTOMER_ID,
                     COUNT(*)           AS txn_count,
-                    SUM(AMOUNT)        AS total_amount_inr,
-                    MIN(CREATED_AT)    AS min_date,
-                    MAX(CREATED_AT)    AS max_date
+                    COALESCE(SUM(AMOUNT_INR), 0) AS total_amount_inr,
+                    MIN(TXN_DATE)      AS min_date,
+                    MAX(TXN_DATE)      AS max_date
                 FROM TRANSACTIONS
-                WHERE AMOUNT BETWEEN {_STRUCTURING_LOWER_INR} AND {_STRUCTURING_UPPER_INR}
-                  AND CREATED_AT >= DATEADD('day', -{days}, CURRENT_TIMESTAMP())
+                WHERE AMOUNT_INR BETWEEN {_STRUCTURING_LOWER_INR} AND {_STRUCTURING_UPPER_INR}
+                  AND TXN_DATE >= DATEADD('day', -{days}, CURRENT_TIMESTAMP())
                   {cust_filter}
                 GROUP BY CUSTOMER_ID
                 HAVING COUNT(*) >= 2
@@ -422,15 +422,14 @@ class FraudDetectionAgent(BaseAgent):
                 SELECT
                     TXN_ID,
                     CUSTOMER_ID,
-                    AMOUNT,
-                    CURRENCY,
+                    AMOUNT_INR,
                     TXN_TYPE,
                     RISK_SCORE,
-                    FLAG_REASON,
-                    CREATED_AT
+                    DESCRIPTION AS FLAG_REASON,
+                    TXN_DATE
                 FROM TRANSACTIONS
-                WHERE IS_FLAGGED = TRUE
-                  AND CREATED_AT >= DATEADD('day', -7, CURRENT_TIMESTAMP())
+                WHERE (AML_FLAG = TRUE OR FRAUD_FLAG = TRUE OR RISK_SCORE >= 70)
+                  AND TXN_DATE >= DATEADD('day', -30, CURRENT_TIMESTAMP())
                 ORDER BY RISK_SCORE DESC
                 LIMIT 50
                 """
@@ -439,12 +438,12 @@ class FraudDetectionAgent(BaseAgent):
                     {
                         "txn_id": r["TXN_ID"],
                         "customer_id": r["CUSTOMER_ID"],
-                        "amount": float(r["AMOUNT"]),
-                        "currency": r["CURRENCY"],
+                        "amount": float(r["AMOUNT_INR"] or 0),
+                        "currency": "INR",
                         "txn_type": r["TXN_TYPE"],
                         "risk_score": int(r["RISK_SCORE"] or 0),
-                        "flag_reason": r["FLAG_REASON"],
-                        "created_at": str(r["CREATED_AT"]),
+                        "flag_reason": r["FLAG_REASON"] or "High risk pattern",
+                        "created_at": str(r["TXN_DATE"]),
                     }
                     for r in rows
                 ]

@@ -212,16 +212,16 @@ class RiskAssessmentAgent(BaseAgent):
                 sql = f"""
                 SELECT
                     COUNT(*)                                   AS total_count,
-                    SUM(AMOUNT)                                AS total_amount_inr,
-                    SUM(CASE WHEN IS_FLAGGED = TRUE THEN 1 ELSE 0 END)
+                    COALESCE(SUM(AMOUNT_INR), 0)               AS total_amount_inr,
+                    SUM(CASE WHEN AML_FLAG = TRUE THEN 1 ELSE 0 END)
                                                                AS flagged_count,
-                    AVG(RISK_SCORE)                            AS avg_risk_score,
+                    COALESCE(AVG(RISK_SCORE), 0)               AS avg_risk_score,
                     SUM(CASE WHEN RISK_SCORE >= {config.HIGH_RISK_THRESHOLD} THEN 1 ELSE 0 END)
                                                                AS high_risk_count,
-                    SUM(CASE WHEN TXN_TYPE = 'INTERNATIONAL' THEN 1 ELSE 0 END)
+                    SUM(CASE WHEN IS_INTERNATIONAL = TRUE THEN 1 ELSE 0 END)
                                                                AS international_count
                 FROM TRANSACTIONS
-                WHERE CREATED_AT >= DATEADD('day', -{days}, CURRENT_TIMESTAMP())
+                WHERE TXN_DATE >= DATEADD('day', -{days}, CURRENT_TIMESTAMP())
                 """
                 rows = self.session.sql(sql).collect()
                 if rows:

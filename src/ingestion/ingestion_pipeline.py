@@ -33,6 +33,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -194,7 +195,7 @@ class IngestionPipeline:
         )
 
         # Step 4: Store
-        if self._env == "snowflake" and self.session is not None:
+        if self.session is not None:
             self._store_snowflake(chunks)
             stored_to = "snowflake:REGULATORY_DOCS"
         else:
@@ -277,47 +278,148 @@ class IngestionPipeline:
         )
         return results
 
+    def ingest_stage(
+        self,
+        stage_name: str = "@AURIS_DB.AURIS_SCHEMA.AURIS_PDF_STAGE",
+        permission_level: str = "junior_analyst",
+        force: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Ingest all PDFs resting inside a Snowflake stage using existing Parser + Chunker.
+
+        Deduplicates against already ingested documents in REGULATORY_DOCS.
+        """
+        if not self.session:
+            raise RuntimeError("Snowpark session required to read from stage.")
+
+        if not stage_name.startswith("@"):
+            stage_name = f"@{stage_name}"
+
+        # 1. Discover already ingested documents to ensure idempotency
+        already_ingested: set[str] = set()
+        if not force:
+            try:
+                rows = self.session.sql("SELECT DISTINCT DOC_NAME FROM REGULATORY_DOCS").collect()
+                for r in rows:
+                    if r["DOC_NAME"]:
+                        already_ingested.add(r["DOC_NAME"].lower().strip())
+            except Exception as e:
+                logger.warning("[IngestionPipeline] Could not check existing docs: %s", e)
+
+        # 2. Discover stage files
+        files = self.session.sql(f"LIST {stage_name}").collect()
+        results: list[dict[str, Any]] = []
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            for row in files:
+                file_url = row["name"]
+                filename = Path(file_url).name
+                if not filename.lower().endswith(".pdf"):
+                    continue
+
+                doc_name_candidate = filename.replace(".pdf", "").replace("_", " ").title().strip()
+                if not force and doc_name_candidate.lower() in already_ingested:
+                    logger.info("[IngestionPipeline] '%s' already ingested; skipping.", doc_name_candidate)
+                    results.append({
+                        "file": filename,
+                        "doc_name": doc_name_candidate,
+                        "status": "skipped_already_ingested",
+                        "chunk_count": 0,
+                    })
+                    continue
+
+                # 3. Pull file stream from stage into container temp directory
+                try:
+                    self.session.file.get(f"{stage_name}/{filename}", tmp_dir)
+                    local_temp_path = os.path.join(tmp_dir, filename)
+
+                    # 4. Ingest using existing parser + chunker pipeline
+                    res = self.ingest_file(
+                        file_path=local_temp_path,
+                        doc_name=doc_name_candidate,
+                        permission_level=permission_level,
+                        source_url=f"{stage_name}/{filename}",
+                    )
+                    results.append(res)
+                except Exception as exc:
+                    logger.error("[IngestionPipeline] Failed to ingest stage file %s: %s", filename, exc)
+                    results.append({
+                        "file": filename,
+                        "doc_name": doc_name_candidate,
+                        "status": "error",
+                        "error": str(exc),
+                    })
+
+        logger.info(
+            "[IngestionPipeline] Stage ingestion complete: %d files processed from %s.",
+            len(results),
+            stage_name,
+        )
+        return results
+
     # ------------------------------------------------------------------ #
     #  Storage backends                                                    #
     # ------------------------------------------------------------------ #
 
     def _store_snowflake(self, chunks: list[dict]) -> None:
-        """INSERT chunks into the REGULATORY_DOCS table via Snowpark."""
+        """INSERT chunks into the REGULATORY_DOCS table via Snowpark in batch."""
         if not self.session:
             logger.error("[IngestionPipeline] No Snowpark session — cannot store.")
             return
 
-        for chunk in chunks:
-            try:
-                sql = """
-                INSERT INTO REGULATORY_DOCS
-                    (DOC_ID, DOC_NAME, DOC_CATEGORY, SECTION_NUMBER,
-                     SECTION_TITLE, CONTENT, SOURCE_URL, EFFECTIVE_DATE,
-                     PERMISSION_LEVEL)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-                self.session.sql(sql, params=[
-                    chunk["doc_id"],
-                    chunk["doc_name"],
-                    chunk["doc_category"],
-                    chunk.get("section_number", ""),
-                    chunk.get("section_title", ""),
-                    chunk["content"],
-                    chunk.get("source_url", ""),
-                    chunk.get("effective_date", ""),
-                    chunk.get("permission_level", "junior_analyst"),
-                ]).collect()
-            except Exception as exc:
-                logger.error(
-                    "[IngestionPipeline] Failed to insert chunk '%s': %s",
-                    chunk["doc_id"],
-                    exc,
-                )
+        if not chunks:
+            return
 
-        logger.info(
-            "[IngestionPipeline] Inserted %d chunks into REGULATORY_DOCS.",
-            len(chunks),
-        )
+        import pandas as pd
+        rows = []
+        for chunk in chunks:
+            eff_date = chunk.get("effective_date")
+            if not eff_date:
+                eff_date = None
+            rows.append({
+                "DOC_ID": str(chunk["doc_id"]),
+                "DOC_NAME": str(chunk["doc_name"]),
+                "DOC_CATEGORY": str(chunk["doc_category"]),
+                "SECTION_NUMBER": str(chunk.get("section_number") or ""),
+                "SECTION_TITLE": str(chunk.get("section_title") or ""),
+                "CONTENT": str(chunk["content"]),
+                "SOURCE_URL": str(chunk.get("source_url") or ""),
+                "EFFECTIVE_DATE": eff_date,
+                "PERMISSION_LEVEL": str(chunk.get("permission_level") or "junior_analyst"),
+            })
+
+        try:
+            pdf_df = pd.DataFrame(rows)
+            # Use Snowpark write.mode("append")
+            sp_df = self.session.create_dataframe(pdf_df)
+            sp_df.write.mode("append").save_as_table("REGULATORY_DOCS")
+            logger.info(
+                "[IngestionPipeline] Batch inserted %d chunks into REGULATORY_DOCS.",
+                len(chunks),
+            )
+        except Exception as exc:
+            logger.error("[IngestionPipeline] Batch insert failed: %s. Falling back to SQL execute.", exc)
+            for chunk in chunks:
+                try:
+                    sql = """
+                    INSERT INTO REGULATORY_DOCS
+                        (DOC_ID, DOC_NAME, DOC_CATEGORY, SECTION_NUMBER,
+                         SECTION_TITLE, CONTENT, SOURCE_URL, EFFECTIVE_DATE,
+                         PERMISSION_LEVEL)
+                    SELECT ?, ?, ?, ?, ?, ?, ?, TRY_TO_DATE(?), ?
+                    """
+                    self.session.sql(sql, params=[
+                        chunk["doc_id"],
+                        chunk["doc_name"],
+                        chunk["doc_category"],
+                        chunk.get("section_number", ""),
+                        chunk.get("section_title", ""),
+                        chunk["content"],
+                        chunk.get("source_url", ""),
+                        chunk.get("effective_date", None),
+                        chunk.get("permission_level", "junior_analyst"),
+                    ]).collect()
+                except Exception as row_exc:
+                    logger.warning("[IngestionPipeline] Error inserting single chunk %s: %s", chunk.get("doc_id"), row_exc)
 
     @staticmethod
     def _store_local(chunks: list[dict], doc_name: str) -> None:
@@ -360,3 +462,27 @@ class IngestionPipeline:
             return best
 
         return "public_policy"  # default fallback
+
+
+def run_auto_ingest_handler(session) -> str:
+    """Snowpark Stored Procedure entrypoint called automatically by the Snowflake Task.
+
+    Discovers new, un-ingested PDFs on @AURIS_PDF_STAGE, chunks them using
+    PDFParser + DocChunker, and appends them to REGULATORY_DOCS.
+    """
+    pipeline = IngestionPipeline(session=session)
+    stage_name = "@AURIS_DB.AURIS_SCHEMA.AURIS_PDF_STAGE"
+    results = pipeline.ingest_stage(stage_name=stage_name)
+
+    new_ingested = [r for r in results if r.get("status") == "success"]
+    total_chunks = sum(r.get("chunk_count", 0) for r in new_ingested)
+    skipped = len(results) - len(new_ingested)
+
+    msg = (
+        f"Stage Ingestion Run: Processed {len(results)} files. "
+        f"Ingested {len(new_ingested)} new PDFs ({total_chunks} chunks). "
+        f"Skipped {skipped} already-ingested files."
+    )
+    logger.info(msg)
+    return msg
+

@@ -1,18 +1,6 @@
--- =============================================================================
--- Auris — 02_tables.sql
--- Purpose : Create all core tables for the Auris compliance intelligence
---           platform. Run after 01_database_warehouse.sql.
--- =============================================================================
 
 USE DATABASE AURIS_DB;
 USE SCHEMA AURIS_SCHEMA;
-
-
--- =============================================================================
--- TABLE 1: TRANSACTIONS
--- Stores every banking transaction ingested into Auris. The RISK_SCORE,
--- AML_FLAG, and FRAUD_FLAG columns are populated by the Snowpark ML pipeline.
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS TRANSACTIONS (
     TXN_ID               VARCHAR(64)     NOT NULL COMMENT 'Unique transaction identifier (UUID or bank-assigned)',
@@ -35,13 +23,6 @@ CREATE TABLE IF NOT EXISTS TRANSACTIONS (
     CONSTRAINT PK_TRANSACTIONS PRIMARY KEY (TXN_ID)
 );
 
-
--- =============================================================================
--- TABLE 2: KYC_PROFILES
--- Know Your Customer master data. PAN and Aadhaar are stored in masked /
--- hashed form to comply with India's PDPB / RBI data-localisation guidelines.
--- =============================================================================
-
 CREATE TABLE IF NOT EXISTS KYC_PROFILES (
     CUSTOMER_ID         VARCHAR(64)     NOT NULL COMMENT 'Unique customer identifier',
     FULL_NAME           VARCHAR(256)    NOT NULL COMMENT 'Legal full name as per KYC document',
@@ -63,12 +44,6 @@ CREATE TABLE IF NOT EXISTS KYC_PROFILES (
 );
 
 
--- =============================================================================
--- TABLE 3: AML_WATCHLIST
--- Consolidated sanctions and watchlist data sourced from OFAC, UN, EU, and RBI.
--- ALIAS_NAMES is a VARIANT column holding a JSON array of known aliases.
--- =============================================================================
-
 CREATE TABLE IF NOT EXISTS AML_WATCHLIST (
     ENTITY_ID    VARCHAR(64)     NOT NULL COMMENT 'Unique watchlist entity identifier',
     ENTITY_NAME  VARCHAR(512)    NOT NULL COMMENT 'Primary name of the sanctioned entity',
@@ -83,14 +58,6 @@ CREATE TABLE IF NOT EXISTS AML_WATCHLIST (
     CONSTRAINT PK_AML_WATCHLIST PRIMARY KEY (ENTITY_ID)
 );
 
-
--- =============================================================================
--- TABLE 4: USER_PERMISSIONS
--- Role-based access control for Auris users. ALLOWED_DOC_CATEGORIES is a
--- VARIANT JSON array controlling which regulatory document types a user may
--- query via the Cortex Search / RAG pipeline.
--- =============================================================================
-
 CREATE TABLE IF NOT EXISTS USER_PERMISSIONS (
     USER_ID                VARCHAR(64)  NOT NULL COMMENT 'Unique user identifier (maps to Snowflake login)',
     USERNAME               VARCHAR(128) NOT NULL COMMENT 'Display name / email',
@@ -102,14 +69,6 @@ CREATE TABLE IF NOT EXISTS USER_PERMISSIONS (
 
     CONSTRAINT PK_USER_PERMISSIONS PRIMARY KEY (USER_ID)
 );
-
-
--- =============================================================================
--- TABLE 5: AUDIT_TRAIL
--- Immutable log of every query submitted to Auris agents. Supports compliance
--- audits, explainability requirements, and usage analytics. AUDIT_ID defaults
--- to a Snowflake-generated UUID so inserts do not need to supply it.
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS AUDIT_TRAIL (
     AUDIT_ID               VARCHAR(64)   NOT NULL DEFAULT UUID_STRING() COMMENT 'Auto-generated UUID for each audit record',
@@ -124,14 +83,6 @@ CREATE TABLE IF NOT EXISTS AUDIT_TRAIL (
 
     CONSTRAINT PK_AUDIT_TRAIL PRIMARY KEY (AUDIT_ID)
 );
-
-
--- =============================================================================
--- TABLE 6: REGULATORY_REPORTS
--- Stores generated compliance reports (AML summaries, Basel disclosures, etc.).
--- REPORT_DATA holds the full structured report payload as a VARIANT JSON object,
--- while the scalar columns enable quick dashboard filtering without parsing JSON.
--- =============================================================================
 
 CREATE TABLE IF NOT EXISTS REGULATORY_REPORTS (
     REPORT_ID                  VARCHAR(64)   NOT NULL DEFAULT UUID_STRING() COMMENT 'Auto-generated UUID for each report',

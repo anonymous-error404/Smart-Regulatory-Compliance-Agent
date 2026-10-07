@@ -398,6 +398,14 @@ class CortexClient:
             Raw text / JSON response from the model.
         """
         _model = model or self._model
+        if self._env == "snowflake" and self.session is not None:
+            try:
+                escaped_prompt = prompt.replace("'", "''")
+                rows = self.session.sql(f"SELECT SNOWFLAKE.CORTEX.COMPLETE('{_model}', '{escaped_prompt}') AS RESP").collect()
+                if rows and rows[0]["RESP"]:
+                    return rows[0]["RESP"]
+            except Exception as exc:
+                logger.warning("[CortexClient] SQL Cortex COMPLETE failed: %s; trying function call", exc)
         return self._complete_fn(_model, prompt)
 
     def rag_search(

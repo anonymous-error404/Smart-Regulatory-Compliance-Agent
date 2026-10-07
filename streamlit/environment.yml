@@ -1,0 +1,10 @@
+name: auris_streamlit_env
+channels:
+  - snowflake
+dependencies:
+  - snowflake-snowpark-python
+  - pandas
+  - plotly
+  - altair
+  - fpdf2
+  - pypdf
